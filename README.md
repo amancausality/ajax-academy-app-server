@@ -1,1 +1,1 @@
-# ajax-node-project
+# academy-app
