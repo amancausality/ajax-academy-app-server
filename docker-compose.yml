@@ -1,0 +1,56 @@
+version: '3.8'
+services:
+  identity-service:
+    build:
+      context: ./identity-service
+    ports:
+      - '5001:5001'
+    environment:
+      - PORT=5001
+      - JWT_SECRET=super-secret-key
+
+  course-service:
+    build:
+      context: ./course-service
+    ports:
+      - '5002:5002'
+    environment:
+      - PORT=5002
+
+  enrollment-service:
+    build:
+      context: ./enrollment-service
+    ports:
+      - '5003:5003'
+    environment:
+      - PORT=5003
+
+  progress-service:
+    build:
+      context: ./progress-service
+    ports:
+      - '5004:5004'
+    environment:
+      - PORT=5004
+
+  notification-service:
+    build:
+      context: ./notification-service
+    ports:
+      - '5005:5005'
+    environment:
+      - PORT=5005
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+    ports:
+      - '4000:4000'
+    environment:
+      - PORT=4000
+    depends_on:
+      - identity-service
+      - course-service
+      - enrollment-service
+      - progress-service
+      - notification-service

@@ -12,6 +12,10 @@ app.get('/', (req, res) => {
   res.send('Welcome to the Academy App Server!');
 });
 
+app.get('/auth/register', (req, res) => {
+  res.send('Welcome to the Identity Service!');
+});
+
 // Start the server
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
