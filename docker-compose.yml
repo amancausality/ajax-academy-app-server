@@ -7,6 +7,7 @@ services:
       - '5001:5001'
     environment:
       - PORT=5001
+      - MONGO_URI=mongodb://mongo:27017/ajaxacademy
       - JWT_SECRET=super-secret-key
 
   course-service:
@@ -16,6 +17,7 @@ services:
       - '5002:5002'
     environment:
       - PORT=5002
+      - MONGO_URI=mongodb://mongo:27017/ajaxacademy
 
   enrollment-service:
     build:
@@ -24,6 +26,7 @@ services:
       - '5003:5003'
     environment:
       - PORT=5003
+      - MONGO_URI=mongodb://mongo:27017/ajaxacademy
 
   progress-service:
     build:
@@ -32,6 +35,7 @@ services:
       - '5004:5004'
     environment:
       - PORT=5004
+      - MONGO_URI=mongodb://mongo:27017/ajaxacademy
 
   notification-service:
     build:
@@ -40,6 +44,7 @@ services:
       - '5005:5005'
     environment:
       - PORT=5005
+      - MONGO_URI=mongodb://mongo:27017/ajaxacademy
 
   api-gateway:
     build:
@@ -48,9 +53,21 @@ services:
       - '4000:4000'
     environment:
       - PORT=4000
+      - MONGO_URI=mongodb://mongo:27017/ajaxacademy
     depends_on:
       - identity-service
       - course-service
       - enrollment-service
       - progress-service
       - notification-service
+
+  mongo:
+    image: mongo:6.0
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=ajaxacademy
+
+volumes:
+  mongo-data:
