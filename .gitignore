@@ -1,1 +1,7 @@
 node_modules/
+api-gateway/node_modules/
+course-service/node_modules/
+enrollment-service/node_modules/
+identity-service/node_modules/
+notification-service/node_modules/
+progress-service/node_modules/
