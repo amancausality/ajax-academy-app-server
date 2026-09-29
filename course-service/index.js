@@ -1,131 +1,140 @@
 const express = require('express');
 const cors = require('cors');
 const { v4: uuid } = require('uuid');
-const dotenv = require('dotenv');
-const path = require('path');
-const mongoose = require('mongoose');
-
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const app = express();
 const port = process.env.PORT || 5002;
 
+const courses = [
+  { id: 'course-1', title: 'React Fundamentals', instructor: 'Ada', duration: '4 weeks', level: 'Beginner' },
+  { id: 'course-2', title: 'Node.js Microservices', instructor: 'Lin', duration: '6 weeks', level: 'Intermediate' },
+  { id: 'course-3', title: 'Python for Data Science', instructor: 'Alex', duration: '8 weeks', level: 'Advanced' },
+];
+
+const users = {};
+
 app.use(express.json());
 app.use(cors());
 
-// In-memory fallback
-let inMemoryCourses = [
-  { id: 'course-1', title: 'React Fundamentals', instructor: 'Ada', duration: '4 weeks', level: 'Beginner' },
-  { id: 'course-2', title: 'Node.js Microservices', instructor: 'Lin', duration: '6 weeks', level: 'Intermediate' },
-];
-
-// Mongoose model (defined once connection is established)
-let Course = null;
-let serverMongooseConnected = false;
-
-const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/ajaxacademy';
-
-const seedIfEmpty = async () => {
-  if (!Course) return;
-  try {
-    const count = await Course.countDocuments();
-    if (count === 0) {
-      await Course.create([
-        { title: 'React Fundamentals', instructor: 'Ada', duration: '4 weeks', level: 'Beginner' },
-        { title: 'Node.js Microservices', instructor: 'Lin', duration: '6 weeks', level: 'Intermediate' },
-      ]);
-      console.log('course-service: seeded MongoDB courses');
-    }
-  } catch (err) {
-    console.error('course-service: seed error', err.message);
+function getUser(userId) {
+  if (!users[userId]) {
+    users[userId] = {
+      id: userId,
+      name: '',
+      email: '',
+      coursePreferences: [],
+    };
   }
-};
 
-const connectDB = async () => {
-  try {
-    await mongoose.connect(mongoUri, { dbName: 'ajaxacademy' });
-
-    const courseSchema = new mongoose.Schema({
-      title: String,
-      instructor: String,
-      duration: String,
-      level: String,
-      createdAt: { type: Date, default: Date.now },
-    });
-
-    Course = mongoose.model('Course', courseSchema);
-    serverMongooseConnected = true;
-    await seedIfEmpty();
-    console.log('course-service: connected to MongoDB');
-  } catch (error) {
-    serverMongooseConnected = false;
-    console.error('course-service: MongoDB connection failed, using in-memory store', error.message);
-  }
-};
-
-connectDB();
-
-// Handler functions exported for use by event triggers or other modules
-async function getCourses(req, res) {
-  if (serverMongooseConnected && Course) {
-    const docs = await Course.find().lean();
-    return res.json(docs.map((d) => ({ id: d._id, title: d.title, instructor: d.instructor, duration: d.duration, level: d.level })));
-  }
-  return res.json(inMemoryCourses);
+  return users[userId];
 }
 
-async function createCourse(req, res) {
-  const payload = { ...req.body };
-  console.log('Courses POST payload:', payload, '-', Course);
-  if (serverMongooseConnected && Course) {
-    const created = await Course.create(payload);
-    return res.status(201).json({ id: created._id, title: created.title, instructor: created.instructor, duration: created.duration, level: created.level });
-  }
-
-  const course = { id: uuid(), ...payload };
-  inMemoryCourses.push(course);
-  return res.status(201).json(course);
-}
-
-async function getCourseById(req, res) {
-  const { id } = req.params;
-  if (serverMongooseConnected && Course) {
-    try {
-      const doc = await Course.findById(id).lean();
-      if (!doc) return res.status(404).json({ error: 'Course not found' });
-      return res.json({ id: doc._id, title: doc.title, instructor: doc.instructor, duration: doc.duration, level: doc.level });
-    } catch (err) {
-      return res.status(404).json({ error: 'Course not found' });
-    }
-  }
-
-  const course = inMemoryCourses.find((item) => item.id === id);
-  if (!course) return res.status(404).json({ error: 'Course not found' });
-  return res.json(course);
-}
-
-function handleEvent(req, res) {
-  console.log('course-service received event:', req.body?.eventType || 'unknown');
-  return res.status(200).json({ received: true });
-}
-
-// Wire routes to handler functions
-app.get('/courses', getCourses);
-app.post('/courses', createCourse);
-app.get('/courses/:id', getCourseById);
-app.post('/events', handleEvent);
-
-// Export handlers for external invocation (e.g., when events trigger actions)
-module.exports = {
-  getCourses,
-  createCourse,
-  getCourseById,
-  handleEvent,
-  connectDB,
-  // export Course reference for advanced uses (may be null until DB connected)
-  Course,
-};
-
-app.listen(port, () => {
-  console.log(`course-service running on http://localhost:${port}`);
+app.get('/courses', (req, res) => {
+  res.json(courses);
 });
+
+app.get('/courses/:id', (req, res) => {
+  const course = courses.find((item) => item.id === req.params.id);
+  if (!course) {
+    return res.status(404).json({ error: 'Course not found' });
+  }
+
+  return res.json(course);
+});
+
+app.post('/courses', (req, res) => {
+  const payload = req.body || {};
+  const course = {
+    id: payload.id || uuid(),
+    title: payload.title,
+    instructor: payload.instructor,
+    duration: payload.duration,
+    level: payload.level,
+  };
+
+  courses.push(course);
+  return res.status(201).json(course);
+});
+
+app.post('/book-course', (req, res) => {
+  const userId = req.headers['x-user-id'] || req.body.userId;
+  const { courseId, title, instructor, duration, level } = req.body || {};
+
+  if (!userId || !courseId) {
+    return res.status(400).json({ error: 'userId and courseId are required' });
+  }
+
+  const course = courses.find((item) => item.id === courseId) || {
+    id: courseId,
+    title: title || 'Unknown Course',
+    instructor: instructor || '',
+    duration: duration || '',
+    level: level || '',
+  };
+
+  const user = getUser(userId);
+  const alreadyBooked = user.coursePreferences.some((item) => item.courseId === course.id);
+
+  if (alreadyBooked) {
+    return res.status(409).json({
+      error: 'Course already booked for this user',
+      user,
+    });
+  }
+
+  user.coursePreferences.push({
+    courseId: course.id,
+    title: course.title,
+    instructor: course.instructor,
+    duration: course.duration,
+    level: course.level,
+    bookedAt: new Date().toISOString(),
+  });
+
+  return res.status(201).json({
+    message: 'Course booked successfully',
+    user,
+  });
+});
+
+app.delete('/book-course/:userId/:courseId', (req, res) => {
+  const { userId, courseId } = req.params;
+
+  if (!userId || !courseId) {
+    return res.status(400).json({ error: 'userId and courseId are required' });
+  }
+
+  const user = getUser(userId);
+  const beforeCount = user.coursePreferences.length;
+  user.coursePreferences = user.coursePreferences.filter((item) => item.courseId !== courseId);
+
+  if (user.coursePreferences.length === beforeCount) {
+    return res.status(404).json({
+      error: 'Booked course not found',
+      user,
+    });
+  }
+
+  return res.status(200).json({
+    message: 'Booked course removed successfully',
+    user,
+  });
+});
+
+app.get('/users/:userId', (req, res) => {
+  const user = getUser(req.params.userId);
+  res.json(user);
+});
+
+if (require.main === module) {
+  app.listen(port, () => {
+    console.log(`course-service running on http://localhost:${port}`);
+  });
+}
+
+module.exports = {
+  app,
+  courses,
+  users,
+  getUser,
+};
